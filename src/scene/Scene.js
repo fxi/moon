@@ -189,16 +189,18 @@ export default class Scene {
     sunLight.position.set(0, 0, 0); // Will be updated by sun position
     sunLight.castShadow = true;
 
-    // Configure shadow map
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
+    // Configure shadow map - optimized for Earth-Moon eclipse system
+    sunLight.shadow.mapSize.width = 4096; // Higher resolution for crisp eclipse shadows
+    sunLight.shadow.mapSize.height = 4096;
     sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 500;
-    sunLight.shadow.camera.left = -100;
-    sunLight.shadow.camera.right = 100;
-    sunLight.shadow.camera.top = 100;
-    sunLight.shadow.camera.bottom = -100;
-    sunLight.shadow.bias = -0.0001;
+    sunLight.shadow.camera.far = 200; // Shorter range focused on our system
+    // Tighter bounds focused on Earth-Moon system (Earth radius ~6, Moon distance ~30)
+    sunLight.shadow.camera.left = -40;
+    sunLight.shadow.camera.right = 40;
+    sunLight.shadow.camera.top = 40;
+    sunLight.shadow.camera.bottom = -40;
+    sunLight.shadow.bias = -0.0005; // Adjusted bias for better shadow visibility
+    sunLight.shadow.normalBias = 0.02; // Add normal bias to reduce shadow acne
 
     this.scene.add(sunLight);
     this.lights.push(sunLight);
@@ -407,6 +409,16 @@ export default class Scene {
       this.sunLight.position.copy(sunPosition);
       this.sunLight.target.position.set(0, 0, 0); // Always point towards origin (Earth)
       this.sunLight.target.updateMatrixWorld();
+      
+      // Ensure shadow camera follows the light direction for optimal eclipse shadows
+      // The shadow camera should be positioned along the light direction
+      const lightDirection = new THREE.Vector3().subVectors(sunPosition, new THREE.Vector3(0, 0, 0)).normalize();
+      
+      // Position shadow camera closer to Earth-Moon system for tighter shadow focus
+      const shadowCameraDistance = 60; // Distance from Earth center
+      this.sunLight.shadow.camera.position.copy(lightDirection.multiplyScalar(shadowCameraDistance));
+      this.sunLight.shadow.camera.lookAt(0, 0, 0); // Look at Earth
+      this.sunLight.shadow.camera.updateProjectionMatrix();
     }
   }
 

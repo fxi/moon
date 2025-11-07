@@ -5,11 +5,12 @@ export default class ViewerMarker {
         this.mesh = null;
         this.earthPosition = new THREE.Vector3(0, 0, 0);
         this.earthRotation = 0;
-        this.radius = 0.5; // Small red dot
+        this.radius =2; // Small red dot
+
         
         // Viewer coordinates (configurable)
-        this.latitude = 45.0; // degrees
-        this.longitude = 45.0; // degrees
+        this.latitude = 46.2; // degrees
+        this.longitude = 6.15; // degrees
         this.earthRadius = 6.371; // Match Earth's radius
         
         this.create();
@@ -42,7 +43,7 @@ export default class ViewerMarker {
         if (!this.mesh) return;
         
         // Account for Earth's rotation
-        const localRotation = this.earthRotation + (this.longitude * Math.PI / 180);
+        const localRotation = - this.earthRotation + (this.longitude * Math.PI / 180);
         
         // Convert latitude to radians
         const lat = this.latitude * Math.PI / 180;
