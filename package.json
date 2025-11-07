@@ -1,0 +1,27 @@
+{
+  "name": "moon-earth-sun-model",
+  "version": "1.0.0",
+  "description": "Interactive astronomical model showing sun, moon, and earth with accurate shadows and time controls",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "nipplejs": "^0.10.2",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  },
+  "keywords": [
+    "astronomy",
+    "three.js",
+    "shadows",
+    "celestial",
+    "interactive"
+  ],
+  "author": "",
+  "license": "MIT"
+}

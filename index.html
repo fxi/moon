@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Moon Earth Sun Model</title>
+    <link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Date and time display at top center -->
+        <div id="datetime-display" class="datetime-display">
+            <div id="date">Loading...</div>
+            <div id="time">00:00</div>
+        </div>
+
+        <!-- Three.js canvas -->
+        <canvas id="scene"></canvas>
+
+        <!-- Time controls at bottom -->
+        <div id="controls" class="controls">
+            <!-- Week slider -->
+            <div class="control-group">
+                <label for="week-slider">Week</label>
+                <input 
+                    type="range" 
+                    id="week-slider" 
+                    class="slider"
+                    min="-25" 
+                    max="25" 
+                    value="0" 
+                    step="1"
+                >
+                <span id="week-value">0</span>
+            </div>
+
+            <!-- Hour of week slider -->
+            <div class="control-group">
+                <label for="hour-slider">Hour</label>
+                <input 
+                    type="range" 
+                    id="hour-slider" 
+                    class="slider"
+                    min="0" 
+                    max="167" 
+                    value="0" 
+                    step="1"
+                >
+                <span id="hour-value">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
