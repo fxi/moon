@@ -24,10 +24,10 @@ class MoonEarthSunApp {
             // Wait for scene to be fully loaded
             await this.waitForSceneLoad();
             
-            // Initialize time controls UI
+            // Initialize time controls UI with dual joystick system
             this.timeControls = new TimeControls((time) => {
                 this.onTimeChange(time);
-            });
+            }, this.scene);
             
             // Setup event listeners
             this.setupEventListeners();

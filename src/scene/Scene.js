@@ -74,50 +74,41 @@ export default class Scene {
   }
 
   setupCamera() {
-    // Create orthographic camera for top-down view
-    const frustumSize = 100; // Smaller frustum to better see Earth and Moon
-    const aspect = window.innerWidth / window.innerHeight;
-
-    this.camera = new THREE.OrthographicCamera(
-      (-frustumSize * aspect) / 2, // left
-      (frustumSize * aspect) / 2, // right
-      frustumSize / 2, // top
-      -frustumSize / 2, // bottom
+    // Create perspective camera for dynamic spherical view around Earth
+    this.camera = new THREE.PerspectiveCamera(
+      60, // field of view
+      window.innerWidth / window.innerHeight, // aspect ratio
       0.1, // near
       1000 // far
     );
 
-    // Position camera directly above Earth for top-down view
-    this.camera.position.set(0, 100, 0);
-    this.camera.lookAt(0, 0, 0);
+    // Camera control properties for spherical coordinates
+    this.cameraDistance = 80; // Distance from Earth center
+    this.minCameraDistance = 20; // Minimum zoom distance
+    this.maxCameraDistance = 200; // Maximum zoom distance
+    this.cameraPitch = 90; // Current pitch (elevation angle)
+    this.cameraBearing = 0; // Current bearing (azimuth angle)
 
-    // Set up zoom-only controls (no rotation)
+    // Position camera initially in top-down view
+    this.updateCameraPosition();
+
+    // Set up controls (zoom and joystick integration)
     this.setupCameraControls();
   }
 
   setupCameraControls() {
     const canvas = this.renderer.domElement;
 
-    // Zoom function for orthographic camera
+    // Zoom function for perspective camera (distance-based)
     const zoom = (delta) => {
-      const zoomSpeed = 10; // Zoom speed for orthographic camera
-      const minZoom = 50; // Minimum zoom (closer view)
-      const maxZoom = 400; // Maximum zoom (farther view)
-
-      // Calculate new zoom level
-      const currentZoom = this.camera.top * 2; // Current frustum height
-      const newZoom = Math.max(
-        minZoom,
-        Math.min(maxZoom, currentZoom + delta * zoomSpeed)
+      const zoomSpeed = 5; // Zoom speed for distance changes
+      const newDistance = Math.max(
+        this.minCameraDistance,
+        Math.min(this.maxCameraDistance, this.cameraDistance + delta * zoomSpeed)
       );
-
-      // Update camera frustum
-      const aspect = window.innerWidth / window.innerHeight;
-      this.camera.left = (-newZoom * aspect) / 2;
-      this.camera.right = (newZoom * aspect) / 2;
-      this.camera.top = newZoom / 2;
-      this.camera.bottom = -newZoom / 2;
-      this.camera.updateProjectionMatrix();
+      
+      this.cameraDistance = newDistance;
+      this.updateCameraPosition();
     };
 
     // Mouse wheel zoom
@@ -154,7 +145,7 @@ export default class Scene {
         );
 
         const deltaDistance = currentPinchDistance - initialPinchDistance;
-        zoom(-deltaDistance * 0.2); // Negative for intuitive pinch direction
+        zoom(-deltaDistance * 0.1); // Negative for intuitive pinch direction
         initialPinchDistance = currentPinchDistance;
       }
     });
@@ -175,6 +166,39 @@ export default class Scene {
     canvas.addEventListener("touchend", (e) => e.preventDefault(), {
       passive: false,
     });
+  }
+
+  // Update camera position based on spherical coordinates around Earth
+  updateCameraPosition() {
+    // Convert spherical coordinates to Cartesian coordinates
+    // Earth is at origin (0, 0, 0)
+    const pitchRadians = THREE.MathUtils.degToRad(this.cameraPitch);
+    const bearingRadians = THREE.MathUtils.degToRad(this.cameraBearing);
+    
+    // Calculate position using spherical coordinates
+    // Y is up, X/Z are horizontal plane
+    const x = this.cameraDistance * Math.sin(pitchRadians) * Math.sin(bearingRadians);
+    const y = this.cameraDistance * Math.cos(pitchRadians);
+    const z = this.cameraDistance * Math.sin(pitchRadians) * Math.cos(bearingRadians);
+    
+    this.camera.position.set(x, y, z);
+    this.camera.lookAt(0, 0, 0); // Always look at Earth center
+  }
+
+  // Set camera angles (called by CameraJoystick)
+  setCameraAngles(pitch, bearing) {
+    this.cameraPitch = pitch;
+    this.cameraBearing = bearing;
+    this.updateCameraPosition();
+  }
+
+  // Get current camera state
+  getCameraState() {
+    return {
+      distance: this.cameraDistance,
+      pitch: this.cameraPitch,
+      bearing: this.cameraBearing
+    };
   }
 
   setupLights() {
@@ -452,12 +476,8 @@ export default class Scene {
   }
 
   onWindowResize() {
-    // Update orthographic camera frustum for new aspect ratio
-    const aspect = window.innerWidth / window.innerHeight;
-    const frustumHeight = this.camera.top * 2; // Current frustum height
-
-    this.camera.left = (-frustumHeight * aspect) / 2;
-    this.camera.right = (frustumHeight * aspect) / 2;
+    // Update perspective camera aspect ratio
+    this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
 
     // Update renderer size

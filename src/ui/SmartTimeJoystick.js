@@ -25,47 +25,14 @@ export default class SmartTimeJoystick {
     }
     
     create() {
-        // Create joystick container
-        const controlsContainer = document.getElementById('controls');
+        // Use existing DOM elements from HTML
+        const joystickZone = document.getElementById('time-joystick-zone');
         
-        // Replace existing control groups with joystick zone
-        const existingGroups = controlsContainer.querySelectorAll('.control-group');
-        existingGroups.forEach(group => group.remove());
+        if (!joystickZone) {
+            throw new Error('Time joystick zone element not found. Make sure the HTML structure is correct.');
+        }
         
-        // Create joystick zone
-        const joystickZone = document.createElement('div');
-        joystickZone.id = 'joystick-zone';
-        joystickZone.className = 'joystick-zone';
-        controlsContainer.appendChild(joystickZone);
-        
-        // Create info display
-        const infoDisplay = document.createElement('div');
-        infoDisplay.className = 'joystick-info';
-        infoDisplay.innerHTML = `
-            <div class="speed-display">
-                <span class="label">Speed:</span>
-                <span id="speed-value">Paused</span>
-            </div>
-            <div class="direction-display">
-                <span class="label">Direction:</span>
-                <span id="direction-value">Neutral</span>
-            </div>
-            <div class="instruction">
-                Move joystick: Up/Down = Forward/Backward, Distance = Speed
-            </div>
-        `;
-        controlsContainer.appendChild(infoDisplay);
-        
-        // Create control buttons
-        const buttonGroup = document.createElement('div');
-        buttonGroup.className = 'control-buttons';
-        buttonGroup.innerHTML = `
-            <button id="resetTime" class="btn btn-reset">Reset to Now</button>
-            <button id="centerJoystick" class="btn btn-center">Center Joystick</button>
-        `;
-        controlsContainer.appendChild(buttonGroup);
-        
-        // Initialize nipplejs
+        // Initialize nipplejs on existing element
         this.manager = nipplejs.create({
             zone: joystickZone,
             mode: 'static',
@@ -78,13 +45,14 @@ export default class SmartTimeJoystick {
             catchDistance: 200
         });
         
-        // Store DOM elements
+        // Store DOM elements (they already exist in HTML)
         this.elements = {
-            speedValue: document.getElementById('speed-value'),
-            directionValue: document.getElementById('direction-value'),
-            resetButton: document.getElementById('resetTime'),
-            centerButton: document.getElementById('centerJoystick')
+            speedValue: document.getElementById('speed-value')
         };
+        
+        if (!this.elements.speedValue) {
+            throw new Error('Speed value element not found. Make sure the HTML structure is correct.');
+        }
     }
     
     setupEventListeners() {
@@ -99,15 +67,6 @@ export default class SmartTimeJoystick {
         
         this.manager.on('end', () => {
             this.handleJoystickEnd();
-        });
-        
-        // Button events
-        this.elements.resetButton.addEventListener('click', () => {
-            this.resetTime();
-        });
-        
-        this.elements.centerButton.addEventListener('click', () => {
-            this.centerJoystick();
         });
     }
     
@@ -175,23 +134,19 @@ export default class SmartTimeJoystick {
     }
     
     updateDisplay() {
-        const effectiveSpeed = this.currentSpeed * this.direction;
+        // Format speed display with direction indicator
+        const formattedSpeed = this.formatSpeed(Math.abs(this.currentSpeed));
+        const directionIndicator = this.currentSpeed > 0 ? (this.direction > 0 ? '▶' : '◀') : '';
         
-        this.elements.speedValue.textContent = this.formatSpeed(Math.abs(this.currentSpeed));
-        
-        if (this.currentSpeed === 0) {
-            this.elements.directionValue.textContent = 'Neutral';
-        } else {
-            this.elements.directionValue.textContent = this.direction > 0 ? 'Forward' : 'Backward';
-        }
+        this.elements.speedValue.textContent = `${directionIndicator} ${formattedSpeed}`.trim();
         
         // Color coding for direction
         if (this.direction > 0 && this.currentSpeed > 0) {
-            this.elements.directionValue.style.color = '#4CAF50'; // Green for forward
+            this.elements.speedValue.style.color = '#4CAF50'; // Green for forward
         } else if (this.direction < 0 && this.currentSpeed > 0) {
-            this.elements.directionValue.style.color = '#f44336'; // Red for backward
+            this.elements.speedValue.style.color = '#f44336'; // Red for backward
         } else {
-            this.elements.directionValue.style.color = '#cccccc'; // Neutral
+            this.elements.speedValue.style.color = '#ffffff'; // Neutral white
         }
     }
     

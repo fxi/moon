@@ -1,13 +1,16 @@
 import SmartTimeJoystick from './SmartTimeJoystick.js';
+import CameraControls from './CameraControls.js';
 
 export default class TimeControls {
-    constructor(onTimeChange) {
+    constructor(onTimeChange, scene) {
         this.onTimeChange = onTimeChange;
+        this.scene = scene; // Reference to Scene for camera control
         this.currentTime = new Date();
         this.baseTime = new Date();
         
-        // Smart joystick for time control
-        this.joystick = null;
+        // Time joystick and camera controls
+        this.timeJoystick = null;
+        this.cameraControls = null;
         
         this.elements = {};
         this.isUpdating = false;
@@ -21,13 +24,24 @@ export default class TimeControls {
         this.elements.currentDate = document.getElementById('date');
         this.elements.currentTime = document.getElementById('time');
         
-        // Create the smart joystick with callback for time speed changes
-        this.joystick = new SmartTimeJoystick((timeIncrement, action) => {
+        // Create the time control joystick (uses existing DOM elements)
+        this.timeJoystick = new SmartTimeJoystick((timeIncrement, action) => {
             this.handleJoystickTimeChange(timeIncrement, action);
         });
         
+        // Create the new camera controls (Tweakpane-based)
+        this.cameraControls = new CameraControls((cameraState) => {
+            this.handleCameraChange(cameraState);
+        }, this.scene);
+        
         // Initial update
         this.updateDisplay();
+    }
+    
+    handleCameraChange(cameraState) {
+        // Camera updates are handled directly by CameraControls
+        // This method kept for compatibility
+        console.log('Camera changed:', cameraState);
     }
     
     setupEventListeners() {
@@ -136,8 +150,19 @@ export default class TimeControls {
     
     // Cleanup
     dispose() {
-        this.stopPlayback();
+        // Clean up time joystick
+        if (this.timeJoystick) {
+            this.timeJoystick.dispose();
+            this.timeJoystick = null;
+        }
         
+        // Clean up camera controls
+        if (this.cameraControls) {
+            this.cameraControls.dispose();
+            this.cameraControls = null;
+        }
+        
+        // Clean up any other resources
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
