@@ -2,13 +2,16 @@ import SmartTimeJoystick from './SmartTimeJoystick.js';
 import CameraControls from './CameraControls.js';
 
 export default class TimeControls {
-    constructor(onTimeChange, scene, initialDate = null) {
+    constructor(onTimeChange, scene, urlParams = {}) {
         this.onTimeChange = onTimeChange;
         this.scene = scene; // Reference to Scene for camera control
         
         // Set initial time (from URL parameter or current time)
-        this.currentTime = initialDate ? new Date(initialDate.getTime()) : new Date();
+        this.currentTime = urlParams.date ? new Date(urlParams.date.getTime()) : new Date();
         this.baseTime = new Date();
+        
+        // Store URL parameters for camera controls
+        this.urlParams = urlParams;
         
         // Time joystick and camera controls
         this.timeJoystick = null;
@@ -21,7 +24,7 @@ export default class TimeControls {
         this.setupEventListeners();
         
         // If we have an initial date from URL, set the scene time
-        if (initialDate && this.onTimeChange) {
+        if (urlParams.date && this.onTimeChange) {
             this.onTimeChange(this.currentTime);
         }
     }
@@ -35,10 +38,10 @@ export default class TimeControls {
             this.handleJoystickTimeChange(timeIncrement, action);
         });
         
-        // Create the new camera controls (Tweakpane-based)
+        // Create the new camera controls (Tweakpane-based) with URL parameters
         this.cameraControls = new CameraControls((cameraState) => {
             this.handleCameraChange(cameraState);
-        }, this.scene);
+        }, this.scene, this.urlParams);
         
         // Setup datetime input event listener
         this.setupDateTimeInput();

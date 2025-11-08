@@ -16,17 +16,26 @@ class MoonEarthSunApp {
     
     parseURLParameters() {
         const urlParams = new URLSearchParams(window.location.search);
-        const dateParam = urlParams.get('date');
+        const params = {
+            date: null,
+            pitch: null,
+            bearing: null,
+            distance: null,
+            lat: null,
+            lng: null,
+            coord: null
+        };
         
+        // Parse date parameter
+        const dateParam = urlParams.get('date');
         if (dateParam) {
             try {
-                // Try parsing as Unix timestamp (milliseconds)
                 const timestamp = parseInt(dateParam);
                 if (!isNaN(timestamp) && timestamp > 0) {
                     const parsedDate = new Date(timestamp);
                     if (parsedDate instanceof Date && !isNaN(parsedDate)) {
+                        params.date = parsedDate;
                         console.log('🔗 URL date parameter found:', parsedDate.toLocaleString());
-                        return parsedDate;
                     }
                 }
             } catch (error) {
@@ -34,26 +43,90 @@ class MoonEarthSunApp {
             }
         }
         
-        return null;
+        // Parse camera parameters
+        const pitchParam = urlParams.get('pitch');
+        if (pitchParam) {
+            const pitch = parseFloat(pitchParam);
+            if (!isNaN(pitch) && pitch >= 0 && pitch <= 90) {
+                params.pitch = pitch;
+                console.log('🔗 URL pitch parameter found:', pitch);
+            }
+        }
+        
+        const bearingParam = urlParams.get('bearing');
+        if (bearingParam) {
+            const bearing = parseFloat(bearingParam);
+            if (!isNaN(bearing) && bearing >= 0 && bearing < 360) {
+                params.bearing = bearing;
+                console.log('🔗 URL bearing parameter found:', bearing);
+            }
+        }
+        
+        const distanceParam = urlParams.get('distance');
+        if (distanceParam) {
+            const distance = parseFloat(distanceParam);
+            if (!isNaN(distance) && distance > 0) {
+                params.distance = distance;
+                console.log('🔗 URL distance parameter found:', distance);
+            }
+        }
+        
+        // Parse viewer coordinates
+        const latParam = urlParams.get('lat');
+        if (latParam) {
+            const lat = parseFloat(latParam);
+            if (!isNaN(lat) && lat >= -90 && lat <= 90) {
+                params.lat = lat;
+                console.log('🔗 URL latitude parameter found:', lat);
+            }
+        }
+        
+        const lngParam = urlParams.get('lng');
+        if (lngParam) {
+            const lng = parseFloat(lngParam);
+            if (!isNaN(lng) && lng >= -180 && lng <= 180) {
+                params.lng = lng;
+                console.log('🔗 URL longitude parameter found:', lng);
+            }
+        }
+        
+        // Parse coordinate system
+        const coordParam = urlParams.get('coord');
+        if (coordParam && ['geocentric', 'heliocentric', 'selenocentric'].includes(coordParam)) {
+            params.coord = coordParam;
+            console.log('🔗 URL coordinate system parameter found:', coordParam);
+        }
+        
+        return params;
     }
     
     async init() {
         try {
             console.log('🌍 Initializing Moon Earth Sun Model...');
             
-            // Parse URL parameters for initial date
-            const initialDate = this.parseURLParameters();
+            // Parse all URL parameters for initial state
+            const urlParams = this.parseURLParameters();
             
             // Initialize the 3D scene
             this.scene = new Scene();
             
+            // Set initial coordinate system if specified in URL
+            if (urlParams.coord) {
+                this.scene.setCoordinateSystem(urlParams.coord);
+            }
+            
+            // Set initial viewer coordinates if specified in URL
+            if (urlParams.lat !== null && urlParams.lng !== null) {
+                this.scene.setViewerCoordinates(urlParams.lat, urlParams.lng);
+            }
+            
             // Wait for scene to be fully loaded
             await this.waitForSceneLoad();
             
-            // Initialize time controls UI with dual joystick system
+            // Initialize time controls UI with URL parameters
             this.timeControls = new TimeControls((time) => {
                 this.onTimeChange(time);
-            }, this.scene, initialDate);
+            }, this.scene, urlParams);
             
             // Setup event listeners
             this.setupEventListeners();

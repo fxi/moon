@@ -1,30 +1,22 @@
 import { Pane } from 'tweakpane';
 
 export default class CameraControls {
-    constructor(onCameraChange, scene) {
+    constructor(onCameraChange, scene, urlParams = {}) {
         this.onCameraChange = onCameraChange;
         this.scene = scene;
+        this.urlParams = urlParams;
         
         // Tweakpane PARAMS object - this holds the actual values
         this.PARAMS = {
-            coordinateSystem: 'geocentric',
-            preset: 'Nadir',
-            pitch: 90,
-            bearing: 0,
-            distance: 80,
+            coordinateSystem: urlParams.coord || 'geocentric',
+            pitch: urlParams.pitch !== null ? urlParams.pitch : 90,
+            bearing: urlParams.bearing !== null ? urlParams.bearing : 0,
+            distance: urlParams.distance !== null ? urlParams.distance : 80,
             background: '#000005',
-            viewerPosition: { x: 6.5, y: 46.1 }
-        };
-        
-        // Generic camera presets - work universally across all coordinate systems
-        this.presets = {
-            'Nadir': { pitch: 90, bearing: 0, description: 'Top-down view' },
-            'Oblique': { pitch: 45, bearing: 0, description: 'Angled view' },
-            'Horizon': { pitch: 15, bearing: 0, description: 'Low angle view' },
-            'North': { pitch: 45, bearing: 0, description: 'Northern perspective' },
-            'East': { pitch: 45, bearing: 90, description: 'Eastern perspective' },
-            'South': { pitch: 45, bearing: 180, description: 'Southern perspective' },
-            'West': { pitch: 45, bearing: 270, description: 'Western perspective' }
+            viewerPosition: { 
+                x: urlParams.lng !== null ? urlParams.lng : 6.5, 
+                y: urlParams.lat !== null ? urlParams.lat : 46.1 
+            }
         };
         
         this.pane = null;
@@ -47,17 +39,17 @@ export default class CameraControls {
         this.pane.element.style.zIndex = '1000';
         this.pane.element.style.width = '280px';
         
-        this.setupPresetControls();
+        this.setupCoordinateControls();
         this.setupViewerControls();
         this.setupManualControls();
         this.setupEnvironmentControls();
         this.setupActionButtons();
         
-        // Set initial preset
-        this.applyPreset('Nadir');
+        // Apply initial state from URL parameters or defaults
+        this.applyInitialState();
     }
     
-    setupPresetControls() {
+    setupCoordinateControls() {
         // Coordinate system folder
         this.folders.coordinate = this.pane.addFolder({
             title: 'Coordinate System',
@@ -77,26 +69,6 @@ export default class CameraControls {
         
         coordinateBinding.on('change', (ev) => {
             this.changeCoordinateSystem(ev.value);
-        });
-        
-        // Camera presets folder
-        this.folders.presets = this.pane.addFolder({
-            title: 'View Presets',
-            expanded: true,
-        });
-        
-        // Preset dropdown (generic presets for all coordinate systems)
-        const presetOptions = Object.keys(this.presets).reduce((acc, key) => {
-            acc[key] = key;
-            return acc;
-        }, {});
-        
-        this.presetBinding = this.folders.presets.addBinding(this.PARAMS, 'preset', {
-            options: presetOptions,
-        });
-        
-        this.presetBinding.on('change', (ev) => {
-            this.applyPreset(ev.value);
         });
     }
     
@@ -168,13 +140,31 @@ export default class CameraControls {
     }
     
     setupActionButtons() {
-        // Quick action buttons
+        // URL state management folder
+        this.folders.urlState = this.pane.addFolder({
+            title: 'URL State Management',
+            expanded: true,
+        });
+        
+        // Save Current View button
+        this.folders.urlState.addButton({
+            title: 'Save Current View',
+        }).on('click', () => {
+            this.saveCurrentView();
+        });
+        
+        // Copy URL button
+        this.folders.urlState.addButton({
+            title: 'Copy URL',
+        }).on('click', () => {
+            this.copyCurrentURL();
+        });
+        
+        // Reset View button
         this.pane.addButton({
             title: 'Reset View',
         }).on('click', () => {
-            this.applyPreset('Nadir');
-            this.PARAMS.preset = 'Nadir';
-            this.pane.refresh();
+            this.resetToDefaults();
         });
     }
     
@@ -186,7 +176,6 @@ export default class CameraControls {
             this.scene.setCoordinateSystem(system);
         }
         
-        // Keep current preset (generic presets work for all systems)
         // Update distance ranges based on coordinate system
         this.updateDistanceRange(system);
         
@@ -213,20 +202,25 @@ export default class CameraControls {
         });
     }
     
-    applyPreset(presetName) {
-        const preset = this.presets[presetName];
-        if (!preset) return;
-        
-        // Update PARAMS object
-        this.PARAMS.pitch = preset.pitch;
-        this.PARAMS.bearing = preset.bearing;
-        this.PARAMS.preset = presetName;
+    // Reset to default values (top-down view)
+    resetToDefaults() {
+        // Reset camera to default values
+        this.PARAMS.pitch = 90;
+        this.PARAMS.bearing = 0;
+        this.PARAMS.distance = 80;
+        this.PARAMS.coordinateSystem = 'geocentric';
+        this.PARAMS.viewerPosition = { x: 6.5, y: 46.1 };
         
         // Update the controls to reflect new values
         this.pane.refresh();
         
-        // Apply camera changes
+        // Apply changes
         this.updateCamera();
+        this.updateDistance();
+        this.updateViewerCoordinates();
+        this.changeCoordinateSystem('geocentric');
+        
+        console.log('🔄 Reset to default camera settings');
     }
     
     updateCamera() {
@@ -282,7 +276,6 @@ export default class CameraControls {
     setCameraState(pitch, bearing) {
         this.PARAMS.pitch = Math.max(0, Math.min(90, pitch));
         this.PARAMS.bearing = ((bearing % 360) + 360) % 360;
-        this.PARAMS.preset = 'Custom';
         
         this.pane.refresh();
         this.updateCamera();
@@ -293,8 +286,7 @@ export default class CameraControls {
         return {
             pitch: this.PARAMS.pitch,
             bearing: this.PARAMS.bearing,
-            distance: this.PARAMS.distance,
-            preset: this.PARAMS.preset
+            distance: this.PARAMS.distance
         };
     }
     
@@ -306,6 +298,102 @@ export default class CameraControls {
     // Toggle expanded state
     toggleExpanded() {
         this.pane.expanded = !this.pane.expanded;
+    }
+    
+    // Apply initial state from URL parameters or defaults
+    applyInitialState() {
+        // Update the controls to reflect current values
+        this.pane.refresh();
+        
+        // Apply camera settings
+        this.updateCamera();
+        this.updateDistance();
+        this.updateViewerCoordinates();
+        
+        console.log('🎥 Applied initial camera state:', {
+            pitch: this.PARAMS.pitch,
+            bearing: this.PARAMS.bearing,
+            distance: this.PARAMS.distance,
+            coordinateSystem: this.PARAMS.coordinateSystem,
+            viewerPosition: this.PARAMS.viewerPosition
+        });
+    }
+    
+    // Generate URL with current state
+    generateStateURL() {
+        const params = new URLSearchParams();
+        
+        // Get current time from the global app or scene
+        let currentTime = new Date();
+        if (window.moonApp && window.moonApp.timeControls && window.moonApp.timeControls.getCurrentTime) {
+            currentTime = window.moonApp.timeControls.getCurrentTime();
+        } else if (this.scene && this.scene.currentTime) {
+            currentTime = this.scene.currentTime;
+        }
+        
+        params.set('date', currentTime.getTime().toString());
+        
+        // Add camera parameters
+        params.set('pitch', this.PARAMS.pitch.toString());
+        params.set('bearing', this.PARAMS.bearing.toString());
+        params.set('distance', this.PARAMS.distance.toString());
+        
+        // Add viewer coordinates
+        params.set('lat', this.PARAMS.viewerPosition.y.toString());
+        params.set('lng', this.PARAMS.viewerPosition.x.toString());
+        
+        // Add coordinate system
+        params.set('coord', this.PARAMS.coordinateSystem);
+        
+        // Generate full URL
+        const baseURL = window.location.origin + window.location.pathname;
+        return `${baseURL}?${params.toString()}`;
+    }
+    
+    // Save current view to URL (updates browser address bar)
+    saveCurrentView() {
+        try {
+            const stateURL = this.generateStateURL();
+            
+            // Update browser address bar without reload
+            window.history.pushState(
+                { moonAppState: true }, 
+                'Moon App - Saved View', 
+                stateURL
+            );
+            
+            console.log('💾 Current view saved to URL:', stateURL);
+            
+        } catch (error) {
+            console.error('❌ Failed to save current view:', error);
+        }
+    }
+    
+    // Copy current URL to clipboard
+    async copyCurrentURL() {
+        try {
+            const urlToCopy = window.location.href;
+            
+            // Use the modern Clipboard API if available
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(urlToCopy);
+                console.log('📋 URL copied to clipboard:', urlToCopy);
+            } else {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = urlToCopy;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                console.log('📋 URL copied to clipboard (fallback):', urlToCopy);
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to copy URL to clipboard:', error);
+        }
     }
     
     // Cleanup
