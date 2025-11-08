@@ -27,19 +27,15 @@ body {
     flex-direction: column;
 }
 
-/* Date and time display at top */
-.datetime-display {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 100;
-    text-align: center;
-    background: rgba(0, 0, 0, 0.7);
-    border-radius: 12px;
-    padding: 8px 16px;
-    backdrop-filter: blur(10px);
+/* Datetime container within controls */
+.datetime-container {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 200px;
 }
 
 .datetime-input {
@@ -52,9 +48,10 @@ body {
     text-align: center;
     font-family: inherit;
     cursor: pointer;
-    padding: 2px 4px;
+    padding: 4px 8px;
     border-radius: 4px;
     transition: background-color 0.2s ease;
+    width: 100%;
 }
 
 .datetime-input:hover {
@@ -87,7 +84,7 @@ body {
 /* Controls at bottom */
 .controls {
     position: absolute;
-    bottom: 20px;
+    bottom: max(20px, env(safe-area-inset-bottom, 0px) + 20px);
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
@@ -97,7 +94,11 @@ body {
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     width: calc(100vw - 40px);
-    max-width: 500px;
+    max-width: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
 }
 
 /* Time Joystick Container */
@@ -257,23 +258,26 @@ body {
 
 /* Responsive adjustments */
 @media (max-width: 480px) {
-    .datetime-display {
-        top: 15px;
-        padding: 6px 12px;
+    .controls {
+        bottom: max(40px, env(safe-area-inset-bottom, 0px) + 30px);
+        width: calc(100vw - 30px);
+        padding: 12px;
+        flex-direction: column;
+        gap: 12px;
     }
     
-    #date {
+    .datetime-container {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .datetime-input {
         font-size: 13px;
     }
     
-    #time {
-        font-size: 11px;
-    }
-    
-    .controls {
-        bottom: 15px;
-        width: calc(100vw - 30px);
-        padding: 12px;
+    .joystick-zone {
+        width: 70px;
+        height: 70px;
     }
     
     .control-group label {
@@ -302,22 +306,23 @@ body {
 
 /* Landscape orientation adjustments */
 @media (orientation: landscape) and (max-height: 600px) {
-    .datetime-display {
-        top: 10px;
-        padding: 4px 8px;
-    }
-    
-    #date {
-        font-size: 12px;
-    }
-    
-    #time {
-        font-size: 10px;
-    }
-    
     .controls {
         bottom: 10px;
         padding: 8px;
+        gap: 15px;
+    }
+    
+    .datetime-container {
+        min-width: 180px;
+    }
+    
+    .datetime-input {
+        font-size: 12px;
+    }
+    
+    .joystick-zone {
+        width: 80px;
+        height: 80px;
     }
     
     .control-group {

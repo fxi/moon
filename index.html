@@ -8,17 +8,17 @@
 </head>
 <body>
     <div id="app">
-        <!-- Date and time display at top center -->
-        <div id="datetime-display" class="datetime-display">
-            <input type="datetime-local" id="datetime-input" class="datetime-input">
-        </div>
-
         <!-- Three.js canvas -->
         <canvas id="scene"></canvas>
 
-        <!-- Time control joystick at bottom -->
+        <!-- Controls at bottom with datetime input and time joystick -->
         <div id="controls" class="controls">
-            <!-- Time control joystick (centered) -->
+            <!-- Datetime input on the left -->
+            <div class="datetime-container">
+                <input type="datetime-local" id="datetime-input" class="datetime-input">
+            </div>
+            
+            <!-- Time control joystick on the right -->
             <div class="joystick-container time-control">
                 <div class="joystick-label">Time</div>
                 <div id="time-joystick-zone" class="joystick-zone"></div>
