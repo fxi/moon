@@ -60,7 +60,7 @@ export default class Earth {
     
     createViewerDot() {
         // Create a 2D circle for the viewer position (flat map marker style)
-        const dotGeometry = new THREE.CircleGeometry(0.15, 16);
+        const dotGeometry = new THREE.CircleGeometry(0.9, 16);
         const dotMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000,
             transparent: true,

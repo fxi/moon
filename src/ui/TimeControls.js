@@ -2,10 +2,12 @@ import SmartTimeJoystick from './SmartTimeJoystick.js';
 import CameraControls from './CameraControls.js';
 
 export default class TimeControls {
-    constructor(onTimeChange, scene) {
+    constructor(onTimeChange, scene, initialDate = null) {
         this.onTimeChange = onTimeChange;
         this.scene = scene; // Reference to Scene for camera control
-        this.currentTime = new Date();
+        
+        // Set initial time (from URL parameter or current time)
+        this.currentTime = initialDate ? new Date(initialDate.getTime()) : new Date();
         this.baseTime = new Date();
         
         // Time joystick and camera controls
@@ -17,12 +19,16 @@ export default class TimeControls {
         
         this.create();
         this.setupEventListeners();
+        
+        // If we have an initial date from URL, set the scene time
+        if (initialDate && this.onTimeChange) {
+            this.onTimeChange(this.currentTime);
+        }
     }
     
     create() {
-        // Use existing HTML elements for date/time display
-        this.elements.currentDate = document.getElementById('date');
-        this.elements.currentTime = document.getElementById('time');
+        // Use datetime input element
+        this.elements.datetimeInput = document.getElementById('datetime-input');
         
         // Create the time control joystick (uses existing DOM elements)
         this.timeJoystick = new SmartTimeJoystick((timeIncrement, action) => {
@@ -34,6 +40,9 @@ export default class TimeControls {
             this.handleCameraChange(cameraState);
         }, this.scene);
         
+        // Setup datetime input event listener
+        this.setupDateTimeInput();
+        
         // Initial update
         this.updateDisplay();
     }
@@ -44,8 +53,31 @@ export default class TimeControls {
         console.log('Camera changed:', cameraState);
     }
     
+    setupDateTimeInput() {
+        if (!this.elements.datetimeInput) return;
+        
+        // Add event listener for datetime input changes
+        this.elements.datetimeInput.addEventListener('change', (event) => {
+            this.handleDateTimeInputChange(event.target.value);
+        });
+    }
+    
     setupEventListeners() {
         // No longer needed - joystick handles its own events
+    }
+    
+    handleDateTimeInputChange(inputValue) {
+        if (this.isUpdating || !inputValue) return;
+        
+        // Parse the datetime-local input value to Date object
+        this.currentTime = new Date(inputValue);
+        
+        // Notify listeners
+        if (this.onTimeChange) {
+            this.onTimeChange(this.currentTime);
+        }
+        
+        console.log('Date/time changed via input:', this.currentTime);
     }
     
     handleJoystickTimeChange(timeIncrement, action) {
@@ -68,24 +100,25 @@ export default class TimeControls {
     }
     
     updateDisplay() {
-        if (!this.elements.currentDate || !this.elements.currentTime) return;
+        if (!this.elements.datetimeInput) return;
         
-        // Format date
-        const dateOptions = { 
-            weekday: 'long',
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric'
-        };
-        this.elements.currentDate.textContent = this.currentTime.toLocaleDateString('en-US', dateOptions);
+        // Prevent circular updates
+        this.isUpdating = true;
         
-        // Format time
-        const timeOptions = {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        };
-        this.elements.currentTime.textContent = this.currentTime.toLocaleTimeString('en-US', timeOptions);
+        // Format current time for datetime-local input (YYYY-MM-DDTHH:mm)
+        const formattedDateTime = this.formatDateTimeForInput(this.currentTime);
+        this.elements.datetimeInput.value = formattedDateTime;
+        
+        this.isUpdating = false;
+    }
+    
+    formatDateTimeForInput(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
     
     resetToNow() {

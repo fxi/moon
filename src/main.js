@@ -14,9 +14,35 @@ class MoonEarthSunApp {
         this.init();
     }
     
+    parseURLParameters() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const dateParam = urlParams.get('date');
+        
+        if (dateParam) {
+            try {
+                // Try parsing as Unix timestamp (milliseconds)
+                const timestamp = parseInt(dateParam);
+                if (!isNaN(timestamp) && timestamp > 0) {
+                    const parsedDate = new Date(timestamp);
+                    if (parsedDate instanceof Date && !isNaN(parsedDate)) {
+                        console.log('🔗 URL date parameter found:', parsedDate.toLocaleString());
+                        return parsedDate;
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Invalid date parameter in URL:', dateParam);
+            }
+        }
+        
+        return null;
+    }
+    
     async init() {
         try {
             console.log('🌍 Initializing Moon Earth Sun Model...');
+            
+            // Parse URL parameters for initial date
+            const initialDate = this.parseURLParameters();
             
             // Initialize the 3D scene
             this.scene = new Scene();
@@ -27,7 +53,7 @@ class MoonEarthSunApp {
             // Initialize time controls UI with dual joystick system
             this.timeControls = new TimeControls((time) => {
                 this.onTimeChange(time);
-            }, this.scene);
+            }, this.scene, initialDate);
             
             // Setup event listeners
             this.setupEventListeners();
