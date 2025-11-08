@@ -124,55 +124,7 @@ export default class Scene {
       zoom(e.deltaY > 0 ? 1 : -1);
     });
 
-    // Touch pinch zoom
-    let initialPinchDistance = 0;
-    let isPinching = false;
-
-    canvas.addEventListener("touchstart", (e) => {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        isPinching = true;
-        const touch1 = e.touches[0];
-        const touch2 = e.touches[1];
-        initialPinchDistance = Math.sqrt(
-          Math.pow(touch2.clientX - touch1.clientX, 2) +
-            Math.pow(touch2.clientY - touch1.clientY, 2)
-        );
-      }
-    });
-
-    canvas.addEventListener("touchmove", (e) => {
-      if (e.touches.length === 2 && isPinching) {
-        e.preventDefault();
-        const touch1 = e.touches[0];
-        const touch2 = e.touches[1];
-        const currentPinchDistance = Math.sqrt(
-          Math.pow(touch2.clientX - touch1.clientX, 2) +
-            Math.pow(touch2.clientY - touch1.clientY, 2)
-        );
-
-        const deltaDistance = currentPinchDistance - initialPinchDistance;
-        zoom(-deltaDistance * 0.1); // Negative for intuitive pinch direction
-        initialPinchDistance = currentPinchDistance;
-      }
-    });
-
-    canvas.addEventListener("touchend", (e) => {
-      if (e.touches.length < 2) {
-        isPinching = false;
-      }
-    });
-
-    // Prevent default touch behaviors
-    canvas.addEventListener("touchstart", (e) => e.preventDefault(), {
-      passive: false,
-    });
-    canvas.addEventListener("touchmove", (e) => e.preventDefault(), {
-      passive: false,
-    });
-    canvas.addEventListener("touchend", (e) => e.preventDefault(), {
-      passive: false,
-    });
+ 
   }
 
   // Update camera position based on spherical coordinates around target
@@ -300,80 +252,9 @@ export default class Scene {
       console.log("All astronomical objects loaded successfully");
     } catch (error) {
       console.error("Error loading astronomical objects:", error);
-
-      // Create fallback objects without textures
-      this.createFallbackObjects();
     }
   }
-
-  createFallbackObjects() {
-    // Create simple colored spheres as fallbacks
-
-    // Earth fallback
-    const earthGeometry = new THREE.SphereGeometry(6.371, 32, 16);
-    const earthMaterial = new THREE.MeshPhongMaterial({ color: 0x2233aa });
-    const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
-    earthMesh.castShadow = true;
-    earthMesh.receiveShadow = true;
-    this.scene.add(earthMesh);
-
-    this.earth = {
-      mesh: earthMesh,
-      setPosition: (x, y, z) => earthMesh.position.set(x, y, z),
-      setRotation: (r) => (earthMesh.rotation.y = r),
-    };
-
-    // Moon fallback
-    const moonGeometry = new THREE.SphereGeometry(1.737, 16, 12);
-    const moonMaterial = new THREE.MeshPhongMaterial({ color: 0xaaaaaa });
-    const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
-    moonMesh.castShadow = true;
-    moonMesh.receiveShadow = true;
-    this.scene.add(moonMesh);
-
-    this.moon = {
-      mesh: moonMesh,
-      setPosition: (x, y, z) => moonMesh.position.set(x, y, z),
-    };
-
-    // Sun fallback
-    const sunGeometry = new THREE.SphereGeometry(20, 32, 16); // Smaller for visibility
-    const sunMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffdd44,
-      emissive: 0xffaa00,
-    });
-    const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
-    this.scene.add(sunMesh);
-
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    sunLight.castShadow = true;
-    this.scene.add(sunLight);
-
-    this.sun = {
-      mesh: sunMesh,
-      light: sunLight,
-      setPosition: (x, y, z) => {
-        sunMesh.position.set(x, y, z);
-        sunLight.position.set(x, y, z);
-      },
-    };
-
-    // Viewer marker fallback
-    const viewerGeometry = new THREE.SphereGeometry(0.5, 8, 8);
-    const viewerMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff0000,
-      emissive: 0x220000,
-    });
-    const viewerMesh = new THREE.Mesh(viewerGeometry, viewerMaterial);
-    this.scene.add(viewerMesh);
-
-    this.viewerMarker = {
-      mesh: viewerMesh,
-      setEarthData: () => {},
-      update: () => {},
-    };
-  }
-
+ 
   updateAstronomicalState(time) {
     // Calculate astronomical positions
     this.astronomicalState = this.astronomy.calculateAstronomicalState(time);
@@ -390,7 +271,8 @@ export default class Scene {
         positions.earth.y,
         positions.earth.z
       );
-      this.earth.setRotation(state.rotations.earth);
+      // Pass the full astronomical state for seasonal tilt calculation
+      this.earth.setRotation(state.rotations.earth, state);
     }
 
     if (this.moon) {
@@ -513,13 +395,19 @@ export default class Scene {
         sunToEarth.normalize().multiplyScalar(60); // Scaled distance for visibility
         positions.earth = positions.sun.clone().add(sunToEarth);
 
-        // Moon relative to Sun (Earth + Moon offset)
-        const sunToMoon = new THREE.Vector3().subVectors(
+        // Moon orbits around Earth, not independently around Sun
+        const earthToMoonHelio = new THREE.Vector3().subVectors(
           state.positions.moon,
-          state.positions.sun
+          state.positions.earth
         );
-        sunToMoon.normalize().multiplyScalar(65); // Slightly further than Earth
-        positions.moon = positions.sun.clone().add(sunToMoon);
+        earthToMoonHelio.normalize().multiplyScalar(15); // Proper Earth-Moon distance (scaled for visibility)
+        
+        // Apply orbital inclination (5.14° relative to ecliptic plane)
+        const inclination = THREE.MathUtils.degToRad(5.14);
+        const moonOrbitRotation = new THREE.Matrix4().makeRotationX(inclination);
+        earthToMoonHelio.applyMatrix4(moonOrbitRotation);
+        
+        positions.moon = positions.earth.clone().add(earthToMoonHelio);
         break;
 
       case "selenocentric":
