@@ -7,6 +7,7 @@ export default class CameraControls {
         
         // Tweakpane PARAMS object - this holds the actual values
         this.PARAMS = {
+            coordinateSystem: 'geocentric',
             preset: 'Nadir',
             pitch: 90,
             bearing: 0,
@@ -14,17 +15,15 @@ export default class CameraControls {
             background: '#000005'
         };
         
-        // Scientific camera presets
+        // Generic camera presets - work universally across all coordinate systems
         this.presets = {
             'Nadir': { pitch: 90, bearing: 0, description: 'Top-down view' },
-            'Zenith': { pitch: 0, bearing: 0, description: 'Bottom-up view' },
-            'North Polar': { pitch: 45, bearing: 0, description: 'Northern perspective' },
-            'South Polar': { pitch: 45, bearing: 180, description: 'Southern perspective' },
-            'Equatorial East': { pitch: 45, bearing: 90, description: 'Eastern horizon view' },
-            'Equatorial West': { pitch: 45, bearing: 270, description: 'Western horizon view' },
-            'Ecliptic Plane': { pitch: 15, bearing: 0, description: 'Low angle, orbital plane' },
-            'Lunar Orbital': { pitch: 60, bearing: 45, description: 'Optimal moon observation' },
-            'Solar Transit': { pitch: 30, bearing: 90, description: 'Sun-Earth-Moon alignment' }
+            'Oblique': { pitch: 45, bearing: 0, description: 'Angled view' },
+            'Horizon': { pitch: 15, bearing: 0, description: 'Low angle view' },
+            'North': { pitch: 45, bearing: 0, description: 'Northern perspective' },
+            'East': { pitch: 45, bearing: 90, description: 'Eastern perspective' },
+            'South': { pitch: 45, bearing: 180, description: 'Southern perspective' },
+            'West': { pitch: 45, bearing: 270, description: 'Western perspective' }
         };
         
         this.pane = null;
@@ -57,23 +56,44 @@ export default class CameraControls {
     }
     
     setupPresetControls() {
-        // Camera presets folder
-        this.folders.presets = this.pane.addFolder({
-            title: 'Scientific Views',
+        // Coordinate system folder
+        this.folders.coordinate = this.pane.addFolder({
+            title: 'Coordinate System',
             expanded: true,
         });
         
-        // Preset dropdown with descriptions
+        // Coordinate system selector
+        const coordinateOptions = {
+            'Geocentric (Earth-centered)': 'geocentric',
+            'Heliocentric (Sun-centered)': 'heliocentric',
+            'Selenocentric (Moon-centered)': 'selenocentric'
+        };
+        
+        const coordinateBinding = this.folders.coordinate.addBinding(this.PARAMS, 'coordinateSystem', {
+            options: coordinateOptions,
+        });
+        
+        coordinateBinding.on('change', (ev) => {
+            this.changeCoordinateSystem(ev.value);
+        });
+        
+        // Camera presets folder
+        this.folders.presets = this.pane.addFolder({
+            title: 'View Presets',
+            expanded: true,
+        });
+        
+        // Preset dropdown (generic presets for all coordinate systems)
         const presetOptions = Object.keys(this.presets).reduce((acc, key) => {
             acc[key] = key;
             return acc;
         }, {});
         
-        const presetBinding = this.folders.presets.addBinding(this.PARAMS, 'preset', {
+        this.presetBinding = this.folders.presets.addBinding(this.PARAMS, 'preset', {
             options: presetOptions,
         });
         
-        presetBinding.on('change', (ev) => {
+        this.presetBinding.on('change', (ev) => {
             this.applyPreset(ev.value);
         });
     }
@@ -107,16 +127,9 @@ export default class CameraControls {
             this.updateCamera();
         });
         
-        // Distance control (zoom)
-        const distanceBinding = this.folders.manual.addBinding(this.PARAMS, 'distance', {
-            min: 20,
-            max: 200,
-            step: 5,
-        });
-        
-        distanceBinding.on('change', (ev) => {
-            this.updateDistance();
-        });
+        // Distance control (zoom) - will be created by updateDistanceRange
+        this.distanceBinding = null;
+        this.updateDistanceRange(this.PARAMS.coordinateSystem);
     }
     
     setupEnvironmentControls() {
@@ -137,11 +150,46 @@ export default class CameraControls {
     setupActionButtons() {
         // Quick action buttons
         this.pane.addButton({
-            title: 'Reset to Nadir',
+            title: 'Reset View',
         }).on('click', () => {
             this.applyPreset('Nadir');
             this.PARAMS.preset = 'Nadir';
             this.pane.refresh();
+        });
+    }
+    
+    changeCoordinateSystem(system) {
+        this.PARAMS.coordinateSystem = system;
+        
+        // Update scene coordinate system
+        if (this.scene && this.scene.setCoordinateSystem) {
+            this.scene.setCoordinateSystem(system);
+        }
+        
+        // Keep current preset (generic presets work for all systems)
+        // Update distance ranges based on coordinate system
+        this.updateDistanceRange(system);
+        
+        console.log(`Coordinate system changed to: ${system}`);
+    }
+    
+    updateDistanceRange(system) {
+        // Update distance control with appropriate ranges for each coordinate system
+        if (this.distanceBinding) {
+            this.distanceBinding.dispose();
+        }
+        
+        const ranges = {
+            'geocentric': { min: 20, max: 200, step: 5 },
+            'heliocentric': { min: 30, max: 300, step: 10 },
+            'selenocentric': { min: 15, max: 150, step: 5 }
+        };
+        
+        const range = ranges[system] || ranges.geocentric;
+        
+        this.distanceBinding = this.folders.manual.addBinding(this.PARAMS, 'distance', range);
+        this.distanceBinding.on('change', (ev) => {
+            this.updateDistance();
         });
     }
     

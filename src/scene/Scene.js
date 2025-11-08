@@ -29,6 +29,10 @@ export default class Scene {
     this.currentTime = new Date();
     this.astronomicalState = null;
 
+    // Coordinate system ('geocentric', 'heliocentric', 'selenocentric')
+    this.coordinateSystem = "geocentric";
+    this.cameraTarget = new THREE.Vector3(0, 0, 0); // What the camera looks at
+
     this.init();
   }
 
@@ -104,9 +108,12 @@ export default class Scene {
       const zoomSpeed = 5; // Zoom speed for distance changes
       const newDistance = Math.max(
         this.minCameraDistance,
-        Math.min(this.maxCameraDistance, this.cameraDistance + delta * zoomSpeed)
+        Math.min(
+          this.maxCameraDistance,
+          this.cameraDistance + delta * zoomSpeed
+        )
       );
-      
+
       this.cameraDistance = newDistance;
       this.updateCameraPosition();
     };
@@ -168,21 +175,27 @@ export default class Scene {
     });
   }
 
-  // Update camera position based on spherical coordinates around Earth
+  // Update camera position based on spherical coordinates around target
   updateCameraPosition() {
     // Convert spherical coordinates to Cartesian coordinates
-    // Earth is at origin (0, 0, 0)
     const pitchRadians = THREE.MathUtils.degToRad(this.cameraPitch);
     const bearingRadians = THREE.MathUtils.degToRad(this.cameraBearing);
-    
-    // Calculate position using spherical coordinates
+
+    // Calculate position using spherical coordinates relative to camera target
     // Y is up, X/Z are horizontal plane
-    const x = this.cameraDistance * Math.sin(pitchRadians) * Math.sin(bearingRadians);
+    const x =
+      this.cameraDistance * Math.sin(pitchRadians) * Math.sin(bearingRadians);
     const y = this.cameraDistance * Math.cos(pitchRadians);
-    const z = this.cameraDistance * Math.sin(pitchRadians) * Math.cos(bearingRadians);
-    
-    this.camera.position.set(x, y, z);
-    this.camera.lookAt(0, 0, 0); // Always look at Earth center
+    const z =
+      this.cameraDistance * Math.sin(pitchRadians) * Math.cos(bearingRadians);
+
+    // Position camera relative to the current coordinate system center
+    this.camera.position.set(
+      this.cameraTarget.x + x,
+      this.cameraTarget.y + y,
+      this.cameraTarget.z + z
+    );
+    this.camera.lookAt(this.cameraTarget); // Look at the coordinate system center
   }
 
   // Set camera angles (called by CameraJoystick)
@@ -197,7 +210,7 @@ export default class Scene {
     return {
       distance: this.cameraDistance,
       pitch: this.cameraPitch,
-      bearing: this.cameraBearing
+      bearing: this.cameraBearing,
     };
   }
 
@@ -207,24 +220,19 @@ export default class Scene {
     this.scene.add(ambientLight);
     this.lights.push(ambientLight);
 
-    // The sun will act as the main directional light
-    // This will be updated when the sun position changes
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    // The sun will act as a point light - like a big light bulb radiating in all directions
+    // This is much more physically accurate than directional light
+    // Using distance=0 for infinite range and higher intensity to compensate
+    const sunLight = new THREE.PointLight(0xffffff, 10000, 0); // color, intensity, distance (0=infinite)
     sunLight.position.set(0, 0, 0); // Will be updated by sun position
     sunLight.castShadow = true;
 
-    // Configure shadow map - optimized for Earth-Moon eclipse system
-    sunLight.shadow.mapSize.width = 4096; // Higher resolution for crisp eclipse shadows
-    sunLight.shadow.mapSize.height = 4096;
-    sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 200; // Shorter range focused on our system
-    // Tighter bounds focused on Earth-Moon system (Earth radius ~6, Moon distance ~30)
-    sunLight.shadow.camera.left = -40;
-    sunLight.shadow.camera.right = 40;
-    sunLight.shadow.camera.top = 40;
-    sunLight.shadow.camera.bottom = -40;
-    sunLight.shadow.bias = -0.0005; // Adjusted bias for better shadow visibility
-    sunLight.shadow.normalBias = 0.02; // Add normal bias to reduce shadow acne
+    // Configure shadow map for point light
+    sunLight.shadow.mapSize.width = 2048; // Good balance of quality vs performance
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 1; // Point light shadow camera settings
+    sunLight.shadow.camera.far = 300; // Cover our entire system
+    sunLight.shadow.bias = -0.0005; // Reduce shadow acne
 
     this.scene.add(sunLight);
     this.lights.push(sunLight);
@@ -372,56 +380,47 @@ export default class Scene {
 
     const state = this.astronomicalState;
 
-    // Always keep Earth centered at origin for top-down view
-    const earthPos = new THREE.Vector3(0, 0, 0);
+    // Calculate positions based on coordinate system
+    const positions = this.calculateCoordinateSystemPositions(state);
 
-    // Calculate Moon position relative to Earth (scaled for visibility)
-    const moonDistance = 30; // Scaled distance for visibility
-    const earthToMoon = new THREE.Vector3().subVectors(
-      state.positions.moon,
-      state.positions.earth
-    );
-    earthToMoon.normalize().multiplyScalar(moonDistance);
-    const moonPos = earthPos.clone().add(earthToMoon);
-
-    // Calculate Sun position (much farther but still visible)
-    const sunDistance = 80; // Scaled distance for visibility
-    const earthToSun = new THREE.Vector3().subVectors(
-      state.positions.sun,
-      state.positions.earth
-    );
-    earthToSun.normalize().multiplyScalar(sunDistance);
-    const sunPos = earthPos.clone().add(earthToSun);
-
-    // Update Earth position and rotation (always at center)
+    // Update object positions
     if (this.earth) {
-      this.earth.setPosition(earthPos.x, earthPos.y, earthPos.z);
+      this.earth.setPosition(
+        positions.earth.x,
+        positions.earth.y,
+        positions.earth.z
+      );
       this.earth.setRotation(state.rotations.earth);
     }
 
-    // Update Moon position
     if (this.moon) {
-      this.moon.setPosition(moonPos.x, moonPos.y, moonPos.z);
+      this.moon.setPosition(
+        positions.moon.x,
+        positions.moon.y,
+        positions.moon.z
+      );
       if (this.moon.setEarthPosition) {
-        this.moon.setEarthPosition(earthPos);
+        this.moon.setEarthPosition(positions.earth);
       }
     }
 
-    // Update Sun position
     if (this.sun) {
-      this.sun.setPosition(sunPos.x, sunPos.y, sunPos.z);
+      this.sun.setPosition(positions.sun.x, positions.sun.y, positions.sun.z);
       if (this.sun.setTarget) {
-        this.sun.setTarget(earthPos);
+        this.sun.setTarget(positions.earth);
       }
     }
 
-    // Update viewer marker
+    // Update viewer marker (always relative to Earth)
     if (this.viewerMarker) {
-      this.viewerMarker.setEarthData(earthPos, state.rotations.earth);
+      this.viewerMarker.setEarthData(positions.earth, state.rotations.earth);
     }
 
     // Update sun lighting
-    this.updateSunLight(sunPos);
+    this.updateSunLight(positions.sun);
+
+    // Update camera target
+    this.updateCameraTarget(positions);
 
     // Store current time
     this.currentTime = time;
@@ -429,20 +428,12 @@ export default class Scene {
 
   updateSunLight(sunPosition) {
     if (this.sunLight) {
-      // Position the directional light at the sun's position
+      // PointLight is simple - just position it at the sun's location
+      // It automatically radiates light in all directions like a real star
       this.sunLight.position.copy(sunPosition);
-      this.sunLight.target.position.set(0, 0, 0); // Always point towards origin (Earth)
-      this.sunLight.target.updateMatrixWorld();
       
-      // Ensure shadow camera follows the light direction for optimal eclipse shadows
-      // The shadow camera should be positioned along the light direction
-      const lightDirection = new THREE.Vector3().subVectors(sunPosition, new THREE.Vector3(0, 0, 0)).normalize();
-      
-      // Position shadow camera closer to Earth-Moon system for tighter shadow focus
-      const shadowCameraDistance = 60; // Distance from Earth center
-      this.sunLight.shadow.camera.position.copy(lightDirection.multiplyScalar(shadowCameraDistance));
-      this.sunLight.shadow.camera.lookAt(0, 0, 0); // Look at Earth
-      this.sunLight.shadow.camera.updateProjectionMatrix();
+      // No target needed for PointLight - it illuminates everything around it naturally!
+      // This works perfectly in all coordinate systems without any special logic
     }
   }
 
@@ -482,6 +473,142 @@ export default class Scene {
 
     // Update renderer size
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  // Calculate positions based on coordinate system
+  calculateCoordinateSystemPositions(state) {
+    const positions = {};
+
+    switch (this.coordinateSystem) {
+      case "geocentric":
+        // Earth at center
+        positions.earth = new THREE.Vector3(0, 0, 0);
+
+        // Moon relative to Earth (scaled)
+        const earthToMoon = new THREE.Vector3().subVectors(
+          state.positions.moon,
+          state.positions.earth
+        );
+        earthToMoon.normalize().multiplyScalar(30); // Scaled distance
+        positions.moon = positions.earth.clone().add(earthToMoon);
+
+        // Sun relative to Earth (scaled)
+        const earthToSun = new THREE.Vector3().subVectors(
+          state.positions.sun,
+          state.positions.earth
+        );
+        earthToSun.normalize().multiplyScalar(80); // Scaled distance
+        positions.sun = positions.earth.clone().add(earthToSun);
+        break;
+
+      case "heliocentric":
+        // Sun at center
+        positions.sun = new THREE.Vector3(0, 0, 0);
+
+        // Earth relative to Sun (scaled)
+        const sunToEarth = new THREE.Vector3().subVectors(
+          state.positions.earth,
+          state.positions.sun
+        );
+        sunToEarth.normalize().multiplyScalar(60); // Scaled distance for visibility
+        positions.earth = positions.sun.clone().add(sunToEarth);
+
+        // Moon relative to Sun (Earth + Moon offset)
+        const sunToMoon = new THREE.Vector3().subVectors(
+          state.positions.moon,
+          state.positions.sun
+        );
+        sunToMoon.normalize().multiplyScalar(65); // Slightly further than Earth
+        positions.moon = positions.sun.clone().add(sunToMoon);
+        break;
+
+      case "selenocentric":
+        // Moon at center (selenocentric = Moon-centered)
+        positions.moon = new THREE.Vector3(0, 0, 0);
+
+        // Earth relative to Moon (scaled)
+        const moonToEarth = new THREE.Vector3().subVectors(
+          state.positions.earth,
+          state.positions.moon
+        );
+        moonToEarth.normalize().multiplyScalar(25); // Scaled distance
+        positions.earth = positions.moon.clone().add(moonToEarth);
+
+        // Sun relative to Moon (scaled)
+        const moonToSun = new THREE.Vector3().subVectors(
+          state.positions.sun,
+          state.positions.moon
+        );
+        moonToSun.normalize().multiplyScalar(80); // Scaled distance
+        positions.sun = positions.moon.clone().add(moonToSun);
+        break;
+
+      default:
+        console.warn(`Unknown coordinate system: ${this.coordinateSystem}`);
+        // Fallback to geocentric
+        return this.calculateCoordinateSystemPositions({
+          ...state,
+          coordinateSystem: "geocentric",
+        });
+    }
+
+    return positions;
+  }
+
+  // Update camera target based on coordinate system
+  updateCameraTarget(positions) {
+    switch (this.coordinateSystem) {
+      case "geocentric":
+        this.cameraTarget.copy(positions.earth);
+        break;
+      case "heliocentric":
+        this.cameraTarget.copy(positions.sun);
+        break;
+      case "selenocentric":
+        this.cameraTarget.copy(positions.moon);
+        break;
+    }
+
+    // Update camera position to reflect new target
+    this.updateCameraPosition();
+  }
+
+  // Set coordinate system
+  setCoordinateSystem(system) {
+    if (["geocentric", "heliocentric", "selenocentric"].includes(system)) {
+      this.coordinateSystem = system;
+
+      // Adjust camera distances for different coordinate systems
+      switch (system) {
+        case "geocentric":
+          this.minCameraDistance = 20;
+          this.maxCameraDistance = 200;
+          this.cameraDistance = Math.min(this.cameraDistance, 150);
+          break;
+        case "heliocentric":
+          this.minCameraDistance = 30;
+          this.maxCameraDistance = 300;
+          this.cameraDistance = Math.max(this.cameraDistance, 120);
+          break;
+        case "selenocentric":
+          this.minCameraDistance = 15;
+          this.maxCameraDistance = 150;
+          this.cameraDistance = Math.min(this.cameraDistance, 80);
+          break;
+      }
+
+      // Recalculate positions
+      this.updateAstronomicalState(this.currentTime);
+
+      console.log(`Coordinate system changed to: ${system}`);
+    } else {
+      console.warn(`Invalid coordinate system: ${system}`);
+    }
+  }
+
+  // Get current coordinate system
+  getCoordinateSystem() {
+    return this.coordinateSystem;
   }
 
   // Public methods for external control

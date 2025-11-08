@@ -12,10 +12,10 @@ export default class SmartTimeJoystick {
         this.animationFrameId = null;
         this.lastFrameTime = 0;
         
-        // Logarithmic scale configuration
-        this.minSpeed = 0.001; // Minimum speed (very slow)
-        this.maxSpeed = 86400; // Maximum speed (1 day per second)
-        this.speedSmoothness = 0.95; // Smoothing factor for speed transitions
+        // Enhanced logarithmic scale configuration - from seconds to months per second
+        this.minSpeed = 0.01; // Minimum speed (0.01 seconds per second)
+        this.maxSpeed = 2592000; // Maximum speed (~1 month per second: 30 days * 24 hours * 3600 seconds)
+        this.speedSmoothness = 0.92; // Smoothing factor for speed transitions (slightly more responsive)
         
         // Joystick instance
         this.manager = null;
@@ -102,34 +102,48 @@ export default class SmartTimeJoystick {
     calculateLogarithmicSpeed(intensity) {
         if (intensity <= 0) return 0;
         
-        // Logarithmic scale: slow at low intensities, fast at high intensities
-        // Using exponential mapping for smooth feel
-        const exponentialFactor = Math.pow(intensity, 2.5); // Curve the response
-        return this.minSpeed + (this.maxSpeed - this.minSpeed) * exponentialFactor;
+        // Enhanced logarithmic scale with quick drop-off for lower speeds
+        // and months/second at maximum
+        
+        // Create multiple logarithmic zones for different time scales
+        const logIntensity = Math.log10(1 + intensity * 99); // Maps 0-1 to 0-2 logarithmically
+        const normalizedLog = logIntensity / 2; // Normalize back to 0-1
+        
+        // Apply power curve for even more dramatic scaling at low end
+        const exponentialFactor = Math.pow(normalizedLog, 3.5); // Higher exponent for quicker drop-off
+        
+        return this.minSpeed * Math.pow(this.maxSpeed / this.minSpeed, exponentialFactor);
     }
     
     formatSpeed(speed) {
         if (speed === 0) return 'Paused';
         
-        if (speed < 1) {
+        const absSpeed = Math.abs(speed);
+        
+        // Enhanced formatting with months, weeks, days, hours, minutes, seconds
+        if (absSpeed < 1) {
             // Less than 1 second per second - show as fractions
-            const minutes = speed * 60;
-            if (minutes < 1) {
-                const seconds = minutes * 60;
-                return `${seconds.toFixed(1)}s/s`;
+            if (absSpeed < 0.1) {
+                return `${(absSpeed * 100).toFixed(1)}cs/s`; // Centiseconds per second
             }
+            return `${absSpeed.toFixed(2)}s/s`;
+        } else if (absSpeed < 60) {
+            return `${absSpeed.toFixed(1)}s/s`;
+        } else if (absSpeed < 3600) {
+            const minutes = absSpeed / 60;
             return `${minutes.toFixed(1)}min/s`;
-        } else if (speed < 60) {
-            return `${speed.toFixed(1)}s/s`;
-        } else if (speed < 3600) {
-            const minutes = speed / 60;
-            return `${minutes.toFixed(1)}min/s`;
-        } else if (speed < 86400) {
-            const hours = speed / 3600;
+        } else if (absSpeed < 86400) {
+            const hours = absSpeed / 3600;
             return `${hours.toFixed(1)}h/s`;
-        } else {
-            const days = speed / 86400;
+        } else if (absSpeed < 604800) { // Less than 1 week per second
+            const days = absSpeed / 86400;
             return `${days.toFixed(1)}d/s`;
+        } else if (absSpeed < 2592000) { // Less than 1 month per second
+            const weeks = absSpeed / 604800;
+            return `${weeks.toFixed(1)}w/s`;
+        } else {
+            const months = absSpeed / 2592000;
+            return `${months.toFixed(1)}mo/s`;
         }
     }
     
