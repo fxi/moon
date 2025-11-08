@@ -12,7 +12,8 @@ export default class CameraControls {
             pitch: 90,
             bearing: 0,
             distance: 80,
-            background: '#000005'
+            background: '#000005',
+            viewerPosition: { x: 6.5, y: 46.1 }
         };
         
         // Generic camera presets - work universally across all coordinate systems
@@ -47,6 +48,7 @@ export default class CameraControls {
         this.pane.element.style.width = '280px';
         
         this.setupPresetControls();
+        this.setupViewerControls();
         this.setupManualControls();
         this.setupEnvironmentControls();
         this.setupActionButtons();
@@ -95,6 +97,24 @@ export default class CameraControls {
         
         this.presetBinding.on('change', (ev) => {
             this.applyPreset(ev.value);
+        });
+    }
+    
+    setupViewerControls() {
+        // Viewer coordinates folder
+        this.folders.viewer = this.pane.addFolder({
+            title: 'Viewer Coordinates',
+            expanded: true,
+        });
+        
+        // Viewer coordinates binding (x = longitude, y = latitude)
+        const viewerBinding = this.folders.viewer.addBinding(this.PARAMS, 'viewerPosition', {
+            x: { min: -180, max: 180, step: 0.1 },
+            y: { min: -90, max: 90, step: 0.1 }
+        });
+        
+        viewerBinding.on('change', (ev) => {
+            this.updateViewerCoordinates();
         });
     }
     
@@ -238,6 +258,24 @@ export default class CameraControls {
         if (this.scene && this.scene.scene) {
             this.scene.scene.background.set(this.PARAMS.background);
         }
+    }
+    
+    updateViewerCoordinates() {
+        // Convert x/y to longitude/latitude (x = longitude, y = latitude)
+        const longitude = this.PARAMS.viewerPosition.x;
+        const latitude = this.PARAMS.viewerPosition.y;
+        
+        // Update Earth's viewer dot position
+        if (this.scene && this.scene.earth && this.scene.earth.setViewerCoordinates) {
+            this.scene.earth.setViewerCoordinates(latitude, longitude);
+        }
+        
+        // Also update the scene's viewer coordinates for astronomical calculations
+        if (this.scene && this.scene.setViewerCoordinates) {
+            this.scene.setViewerCoordinates(latitude, longitude);
+        }
+        
+        console.log(`Viewer coordinates updated to: ${latitude}°N, ${longitude}°E`);
     }
     
     // Set camera state externally (for compatibility)

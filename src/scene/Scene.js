@@ -2,7 +2,6 @@ import * as THREE from "three";
 import Earth from "../objects/Earth.js";
 import Moon from "../objects/Moon.js";
 import Sun from "../objects/Sun.js";
-import ViewerMarker from "../objects/ViewerMarker.js";
 import AstronomicalCalculations from "../astronomy/AstronomicalCalculations.js";
 
 export default class Scene {
@@ -16,7 +15,6 @@ export default class Scene {
     this.earth = null;
     this.moon = null;
     this.sun = null;
-    this.viewerMarker = null;
 
     // Astronomical calculations
     this.astronomy = new AstronomicalCalculations();
@@ -245,10 +243,6 @@ export default class Scene {
       this.scene.add(this.sun.mesh);
       this.scene.add(this.sun.light);
 
-      // Create viewer marker
-      this.viewerMarker = new ViewerMarker();
-      this.scene.add(this.viewerMarker.mesh);
-
       console.log("All astronomical objects loaded successfully");
     } catch (error) {
       console.error("Error loading astronomical objects:", error);
@@ -293,10 +287,6 @@ export default class Scene {
       }
     }
 
-    // Update viewer marker (always relative to Earth)
-    if (this.viewerMarker) {
-      this.viewerMarker.setEarthData(positions.earth, state.rotations.earth);
-    }
 
     // Update sun lighting
     this.updateSunLight(positions.sun);
@@ -337,9 +327,6 @@ export default class Scene {
       this.sun.update(deltaTime);
     }
 
-    if (this.viewerMarker && this.viewerMarker.update) {
-      this.viewerMarker.update(deltaTime);
-    }
 
     // Render scene
     this.renderer.render(this.scene, this.camera);
@@ -510,8 +497,8 @@ export default class Scene {
 
   setViewerCoordinates(latitude, longitude) {
     this.astronomy.setViewerCoordinates(latitude, longitude);
-    if (this.viewerMarker && this.viewerMarker.setCoordinates) {
-      this.viewerMarker.setCoordinates(latitude, longitude);
+    if (this.earth && this.earth.setViewerCoordinates) {
+      this.earth.setViewerCoordinates(latitude, longitude);
     }
     // Recalculate with new viewer position
     this.updateAstronomicalState(this.currentTime);
@@ -536,8 +523,6 @@ export default class Scene {
     if (this.earth && this.earth.dispose) this.earth.dispose();
     if (this.moon && this.moon.dispose) this.moon.dispose();
     if (this.sun && this.sun.dispose) this.sun.dispose();
-    if (this.viewerMarker && this.viewerMarker.dispose)
-      this.viewerMarker.dispose();
 
     // Clean up geometries, materials, textures
     this.scene.traverse((child) => {

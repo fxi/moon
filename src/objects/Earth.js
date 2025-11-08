@@ -8,8 +8,9 @@ export default class Earth {
         this.rotationSpeed = 0; // Will be set based on time
         this.texture = null;
         
-        // Viewer position (longitude 45°)
-        this.viewerLongitude = 45; // degrees
+        // Viewer position (default: 46.1°N, 6.5°E)
+        this.viewerLatitude = 46.1; // degrees
+        this.viewerLongitude = 6.5; // degrees
     }
     
     async load() {
@@ -58,16 +59,20 @@ export default class Earth {
     }
     
     createViewerDot() {
-        // Create a small red sphere for the viewer position
-        const dotGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+        // Create a 2D circle for the viewer position (flat map marker style)
+        const dotGeometry = new THREE.CircleGeometry(0.15, 16);
         const dotMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000,
-            transparent: false
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide, // Visible from both sides
+            depthTest: false // Always visible, not occluded
         });
         
         this.redDot = new THREE.Mesh(dotGeometry, dotMaterial);
+        this.redDot.renderOrder = 1000; // Render on top
         
-        // Position the red dot at longitude 45°
+        // Position the red dot at the viewer coordinates
         this.updateViewerDotPosition();
         
         // Add red dot to Earth mesh so it rotates with Earth
@@ -77,16 +82,23 @@ export default class Earth {
     updateViewerDotPosition() {
         if (!this.redDot) return;
         
-        // Convert longitude to radians
+        // Convert coordinates to radians
+        const latitudeRad = (this.viewerLatitude * Math.PI) / 180;
         const longitudeRad = (this.viewerLongitude * Math.PI) / 180;
         
         // Position on Earth's surface (slightly above to be visible)
-        const dotRadius = this.radius + 0.15;
-        const x = dotRadius * Math.cos(longitudeRad);
-        const z = dotRadius * Math.sin(longitudeRad);
-        const y = 0; // At equator for simplicity
+        const dotRadius = this.radius + 0.2;
+        
+        // Calculate 3D position using spherical coordinates
+        const x = dotRadius * Math.cos(latitudeRad) * Math.cos(longitudeRad);
+        const y = dotRadius * Math.sin(latitudeRad);
+        const z = dotRadius * Math.cos(latitudeRad) * Math.sin(longitudeRad);
         
         this.redDot.position.set(x, y, z);
+        
+        // Make the dot always face outward (normal to Earth's surface)
+        const normal = new THREE.Vector3(x, y, z).normalize();
+        this.redDot.lookAt(this.redDot.position.clone().add(normal));
     }
     
     setPosition(x, y, z) {
@@ -166,10 +178,37 @@ export default class Earth {
         return this.mesh ? this.mesh.rotation.y : 0;
     }
     
-    // Set viewer longitude (for future configurability)
-    setViewerLongitude(longitude) {
-        this.viewerLongitude = longitude;
+    // Set viewer coordinates
+    setViewerCoordinates(latitude, longitude) {
+        this.viewerLatitude = Math.max(-90, Math.min(90, latitude));
+        this.viewerLongitude = ((longitude % 360) + 360) % 360; // Normalize to 0-360
+        if (this.viewerLongitude > 180) {
+            this.viewerLongitude -= 360; // Convert to -180 to 180 range
+        }
         this.updateViewerDotPosition();
+    }
+    
+    // Set viewer latitude only
+    setViewerLatitude(latitude) {
+        this.viewerLatitude = Math.max(-90, Math.min(90, latitude));
+        this.updateViewerDotPosition();
+    }
+    
+    // Set viewer longitude only  
+    setViewerLongitude(longitude) {
+        this.viewerLongitude = ((longitude % 360) + 360) % 360; // Normalize to 0-360
+        if (this.viewerLongitude > 180) {
+            this.viewerLongitude -= 360; // Convert to -180 to 180 range
+        }
+        this.updateViewerDotPosition();
+    }
+    
+    // Get current viewer coordinates
+    getViewerCoordinates() {
+        return {
+            latitude: this.viewerLatitude,
+            longitude: this.viewerLongitude
+        };
     }
     
     // Calculate local solar time at viewer position
